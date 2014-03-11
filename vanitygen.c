@@ -349,9 +349,11 @@ main(int argc, char **argv)
 	const char *result_file = NULL;
 	const char *key_password = NULL;
 	char **patterns;
+    const char* regex_prefix;
 	int npatterns = 0;
 	int nthreads = 0;
 	vg_context_t *vcp = NULL;
+    vg_context_t *vcp2 = NULL;
 	EC_POINT *pubkey_base = NULL;
 
 	FILE *pattfp[MAX_FILE], *fp;
@@ -360,8 +362,9 @@ main(int argc, char **argv)
 	int pattstdin = 0;
 
 	int i;
+    int rp = 0;
 
-	while ((opt = getopt(argc, argv, "vqnrik1eE:P:NTX:F:t:h?f:o:s:")) != -1) {
+	while ((opt = getopt(argc, argv, "vqnrik1eE:P:NTX:F:t:h?f:o:s:R:")) != -1) {
 		switch (opt) {
 		case 'v':
 			verbose = 2;
@@ -442,6 +445,14 @@ main(int argc, char **argv)
 				return 1;
 			}
 			break;
+        case 'R':
+            if(rp){
+                fprintf(stderr, "Too many prefixes specified");
+                return 1;
+            }
+            regex_prefix = optarg;
+            rp = 1;
+            break;
 		case 'f':
 			if (npattfp >= MAX_FILE) {
 				fprintf(stderr,
@@ -499,7 +510,7 @@ main(int argc, char **argv)
 	}
 #endif
 
-	if (caseinsensitive && regex)
+	if (caseinsensitive && regex && !rp)
 		fprintf(stderr,
 			"WARNING: case insensitive mode incompatible with "
 			"regular expressions\n");
@@ -537,8 +548,17 @@ main(int argc, char **argv)
 	}
 
 	if (regex) {
-		vcp = vg_regex_context_new(addrtype, privtype);
-
+        if(rp){
+            vcp2 = vg_prefix_context_new(addrtype, privtype, caseinsensitive);
+            patterns = (char **) &regex_prefix;
+            npatterns = 1;
+            
+            if (!vg_context_add_patterns(vcp2,
+                                         (const char ** const) patterns,
+                                         npatterns))
+                return 1;
+        }
+		vcp = vg_regex_context_new(addrtype, privtype, vcp2);
 	} else {
 		vcp = vg_prefix_context_new(addrtype, privtype,
 					    caseinsensitive);

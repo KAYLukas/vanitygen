@@ -1461,7 +1461,6 @@ vg_prefix_get_difficulty(int addrtype, const char *pattern)
 	return diffret;
 }
 
-
 static int
 vg_prefix_test(vg_exec_context_t *vxcp)
 {
@@ -1605,6 +1604,7 @@ typedef struct _vg_regex_context_s {
 	pcre_extra		**vcr_regex_extra;
 	const char		**vcr_regex_pat;
 	unsigned long		vcr_nalloc;
+    vg_context_t    *prefix_context;
 } vg_regex_context_t;
 
 static int
@@ -1712,6 +1712,8 @@ static int
 vg_regex_test(vg_exec_context_t *vxcp)
 {
 	vg_regex_context_t *vcrp = (vg_regex_context_t *) vxcp->vxc_vc;
+	vg_prefix_context_t *vccp = (vg_prefix_context_t*) vcrp->prefix_context;
+    vg_prefix_t *vp;
 
 	unsigned char hash1[32], hash2[32];
 	int i, zpfx, p, d, nres, re_vec[9];
@@ -1722,6 +1724,16 @@ vg_regex_test(vg_exec_context_t *vxcp)
 
 	pcre *re;
 
+    bn = &vxcp->vxc_bntmp;
+
+    if(vccp){
+        BN_bin2bn(vxcp->vxc_binres, 25, bn);
+        vp = vg_prefix_avl_search(&vccp->vcp_avlroot, bn);
+        if(!vp){
+            return res;
+        }
+    }
+    
 	BN_init(&bnrem);
 
 	/* Hash the hash and write the four byte check code */
@@ -1729,11 +1741,15 @@ vg_regex_test(vg_exec_context_t *vxcp)
 	SHA256(hash1, sizeof(hash1), hash2);
 	memcpy(&vxcp->vxc_binres[21], hash2, 4);
 
-	bn = &vxcp->vxc_bntmp;
 	bndiv = &vxcp->vxc_bntmp2;
 
 	BN_bin2bn(vxcp->vxc_binres, 25, bn);
-
+    if(vccp){
+        vp = vg_prefix_avl_search(&vccp->vcp_avlroot, bn);
+        if(!vp){
+            goto out;
+        }
+    }
 	/* Compute the complete encoded address */
 	for (zpfx = 0; zpfx < 25 && vxcp->vxc_binres[zpfx] == 0; zpfx++);
 	p = sizeof(b58) - 1;
@@ -1818,7 +1834,7 @@ out:
 }
 
 vg_context_t *
-vg_regex_context_new(int addrtype, int privtype)
+vg_regex_context_new(int addrtype, int privtype, vg_context_t *prefix_context)
 {
 	vg_regex_context_t *vcrp;
 
@@ -1839,6 +1855,7 @@ vg_regex_context_new(int addrtype, int privtype)
 		vcrp->base.vc_hash160_sort = NULL;
 		vcrp->vcr_regex = NULL;
 		vcrp->vcr_nalloc = 0;
+        vcrp->prefix_context = prefix_context;
 	}
 	return &vcrp->base;
 }
