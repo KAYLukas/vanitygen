@@ -1744,12 +1744,7 @@ vg_regex_test(vg_exec_context_t *vxcp)
 	bndiv = &vxcp->vxc_bntmp2;
 
 	BN_bin2bn(vxcp->vxc_binres, 25, bn);
-    if(vccp){
-        vp = vg_prefix_avl_search(&vccp->vcp_avlroot, bn);
-        if(!vp){
-            goto out;
-        }
-    }
+    
 	/* Compute the complete encoded address */
 	for (zpfx = 0; zpfx < 25 && vxcp->vxc_binres[zpfx] == 0; zpfx++);
 	p = sizeof(b58) - 1;
